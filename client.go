@@ -18,8 +18,13 @@ import (
 
 type Object = map[string]any
 
+// DefaultBaseURL is the production Ternwire API origin, used when Config.BaseURL is empty.
+const DefaultBaseURL = "https://ternwire.com"
+
 type Config struct {
-	APIKey  string
+	APIKey string
+	// BaseURL is the API origin without /v1. Leave it empty to use DefaultBaseURL,
+	// or set it to reach another deployment such as http://localhost:3001.
 	BaseURL string
 	Timeout time.Duration
 }
@@ -47,7 +52,11 @@ func NewClient(config Config) (*Client, error) {
 	if !apiKeyPattern.MatchString(config.APIKey) {
 		return nil, fmt.Errorf("use an em_live_ or em_test_ API key")
 	}
-	origin, err := url.Parse(config.BaseURL)
+	baseURL := config.BaseURL
+	if baseURL == "" {
+		baseURL = DefaultBaseURL
+	}
+	origin, err := url.Parse(baseURL)
 	if err != nil || origin == nil || (origin.Scheme != "https" && origin.Scheme != "http") ||
 		origin.Hostname() == "" || origin.User != nil || (origin.Path != "" && origin.Path != "/") ||
 		origin.RawQuery != "" || origin.ForceQuery || origin.Fragment != "" {
@@ -73,7 +82,7 @@ func NewClient(config Config) (*Client, error) {
 		transport.Proxy = nil
 		httpClient.Transport = transport
 	}
-	return &Client{apiKey: config.APIKey, baseURL: strings.TrimRight(config.BaseURL, "/"), http: httpClient}, nil
+	return &Client{apiKey: config.APIKey, baseURL: strings.TrimRight(baseURL, "/"), http: httpClient}, nil
 }
 
 func isLoopbackHost(host string) bool {

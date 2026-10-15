@@ -2,6 +2,7 @@ package ternwire
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -131,5 +132,37 @@ func TestListEmailTemplatesSendsCursorAndLimit(t *testing.T) {
 	want := []string{"/v1/templates?cursor=c%2B%2F%3D+x&limit=10", "/v1/templates"}
 	if strings.Join(targets, " ") != strings.Join(want, " ") {
 		t.Fatalf("targets = %q, want %q", targets, want)
+	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func TestClientSendsRequestsToTheConfiguredOrigin(t *testing.T) {
+	for _, tc := range []struct{ baseURL, want string }{
+		{"", "https://ternwire.com/v1/templates"},
+		{"https://staging.example.com/", "https://staging.example.com/v1/templates"},
+	} {
+		client, err := NewClient(Config{APIKey: testAPIKey, BaseURL: tc.baseURL})
+		if err != nil {
+			t.Fatalf("%q: %v", tc.baseURL, err)
+		}
+		var targets []string
+		client.http.Transport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
+			targets = append(targets, r.URL.String())
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     http.Header{"Content-Type": {"application/json"}},
+				Body:       io.NopCloser(strings.NewReader(`{"data":[],"page":{"nextCursor":null,"hasMore":false}}`)),
+				Request:    r,
+			}, nil
+		})
+		if _, err := client.ListEmailTemplates(context.Background(), ListEmailTemplatesQuery{}); err != nil {
+			t.Fatalf("%q: %v", tc.baseURL, err)
+		}
+		if len(targets) != 1 || targets[0] != tc.want {
+			t.Errorf("%q: targets = %q, want [%q]", tc.baseURL, targets, tc.want)
+		}
 	}
 }
