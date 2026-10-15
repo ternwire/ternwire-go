@@ -13,7 +13,7 @@ import ternwire "github.com/ternwire/ternwire-go"
 For local development, add a replacement to the consuming application's `go.mod`:
 
 ```go
-require github.com/ternwire/ternwire-go v0.1.0
+require github.com/ternwire/ternwire-go v0.2.0
 replace github.com/ternwire/ternwire-go => /absolute/path/to/ternwire-go
 ```
 
